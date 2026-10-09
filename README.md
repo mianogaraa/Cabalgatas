@@ -18,7 +18,7 @@
 
 ## 📸 Vista previa
 
-![Ventana principal](docs/captura.png)
+![Ventana principal](captura.png.png)
 
 ## ✨ Qué hace
 
@@ -122,8 +122,6 @@ erDiagram
 
 La base `cabalgatas.db` se crea sola al iniciar el programa. Las fechas se guardan como `AAAA-MM-DD` (para ordenar y filtrar con SQL) y se muestran como `DD-MM-AAAA`.
 
-En la carpeta [`docs`](docs) hay scripts `.sql` con datos de ejemplo para cargar caballos y cabalgatas.
-
 ## 🛠️ Tecnologías
 
 - **Java 23** con **Swing** (`JFrame`, `JDialog`, `JTable`, `JComboBox`, `JCheckBox`)
@@ -141,7 +139,7 @@ Cabalgatas/
 │   ├── vista/                ventanas y estilo
 │   ├── controlador/          un controlador por vista
 │   └── imagenes/             logo
-├── docs/                     captura y datos de ejemplo
+├── captura.png.png           captura de pantalla
 └── cabalgatas.db             base de datos SQLite
 ```
 
@@ -152,6 +150,7 @@ Cabalgatas/
 3. Ejecutar la clase `Cabalgatas` (botón verde de Run).
 
 Requiere tener instalado un JDK (el proyecto usa JDK 23).
+
 ## 🚀 Mejoras futuras
 
 - **Cabalgatas grupales:** poder asignar varios caballos a una misma cabalgata (por ejemplo, un grupo de clientes), manteniendo la validación de superposición para cada uno.
