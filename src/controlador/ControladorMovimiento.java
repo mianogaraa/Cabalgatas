@@ -1,159 +1,95 @@
-package controlador;
+package controlador; 
 
-import java.sql.SQLException;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.format.DateTimeParseException;
-import modelo.Caballo;
-import modelo.Fechas;
-import modelo.Movimiento;
-import modelo.MovimientoDAO;
-import modelo.MovimientoDiurno;
-import modelo.MovimientoNocturno;
-import vista.MovimientoDialog;
+import java.sql.SQLException; // error que puede tirar la base de datos
+import modelo.Caballo; // el caballo
+import modelo.Fechas; // traductor de fechas entre el formato de pantalla y el de la base
+import modelo.Movimiento; // la cabalgata (clase abstracta)
+import modelo.MovimientoDAO; // clase que guarda y consulta cabalgatas en la base
+import modelo.MovimientoDiurno; // cabalgata de dia (hija de Movimiento)
+import modelo.MovimientoNocturno; // cabalgata de noche (hija de Movimiento)
+import modelo.Validaciones; // reglas compartidas: horario, superposicion y formato de datos
+import vista.MovimientoDialog; // el formulario de cabalgata que este controlador maneja
 
-public class ControladorMovimiento {
+public class ControladorMovimiento { // controlador del formulario de alta y modificacion de cabalgatas
 
-    private static final LocalTime INICIO_DIA = LocalTime.of(8, 0);
-    private static final LocalTime INICIO_NOCHE = LocalTime.of(19, 0);
+    private MovimientoDialog vista; // el formulario: de aca leo los datos y en el muestro mensajes
+    private MovimientoDAO movimientoDAO = new MovimientoDAO(); // DAO para consultar y guardar cabalgatas
+    private Movimiento existente; // cabalgata que se esta modificando; null si es nueva
+    private Movimiento guardado; // cabalgata guardada; null hasta que se guarde bien (la lee ControladorPrincipal)
 
-    private MovimientoDialog vista;
-    private MovimientoDAO movimientoDAO = new MovimientoDAO();
-    private Movimiento existente;
-    private Movimiento guardado;
+    public ControladorMovimiento(MovimientoDialog vista, Movimiento existente) { // constructor: lo llama ControladorPrincipal con el formulario y la cabalgata
+        this.vista = vista; // guarda el formulario recibido
+        this.existente = existente; // guarda la cabalgata a modificar (o null si es nueva)
+        if (existente != null) { // si se esta modificando...
+            vista.cargar(existente); // ...llena el formulario con sus datos
+        } 
+        vista.getBtnGuardar().addActionListener(e -> guardar()); // al apretar Guardar, ejecuta guardar()
+        vista.getBtnCancelar().addActionListener(e -> vista.dispose()); // al apretar Cancelar, cierra el formulario sin guardar
+    } 
 
-    public ControladorMovimiento(MovimientoDialog vista, Movimiento existente) {
-        this.vista = vista;
-        this.existente = existente;
-        if (existente != null) {
-            vista.cargar(existente);
-        }
-        vista.getBtnGuardar().addActionListener(e -> guardar());
-        vista.getBtnCancelar().addActionListener(e -> vista.dispose());
-    }
+    public Movimiento getGuardado() { // getter: devuelve la cabalgata guardada
+        return guardado; // ControladorPrincipal lo usa para seleccionar ese caballo en la tabla; es null si no se guardo
+    } 
 
-    public Movimiento getGuardado() {
-        return guardado;
-    }
+    private void guardar() { // se ejecuta al apretar Guardar
+        String error = validarCampos(); // revisa los datos; devuelve un texto de error o null si esta todo bien
+        if (error != null) { // si hay un error...
+            vista.mostrarMensaje(error); // ...se lo muestra al usuario
+            return; // ...y sale sin guardar nada
+        } 
+        Movimiento movimiento = crearMovimiento(); // arma el objeto (Diurno o Nocturno) con lo que escribio el usuario
+        error = Validaciones.validarHorario(movimiento); // controla que el horario corresponda al tipo (diurno 08-19, nocturno 19-00)
+        if (error != null) { // si el horario no corresponde...
+            vista.mostrarMensaje(error); // ...muestra el aviso
+            return; // ...y sale sin guardar
+        } 
+        try { // consultar o guardar en la base puede fallar
+            error = Validaciones.buscarSuperposicion(movimiento, movimientoDAO); // revisa si el caballo ya tiene otra cabalgata que se pise
+            if (error != null) { // si hay superposicion...
+                vista.mostrarMensaje(error); // ...muestra el horario que esta ocupado
+                return; // ...y sale sin guardar
+            } 
+            if (existente == null) { // si es una cabalgata nueva...
+                movimientoDAO.insertar(movimiento); // ...la inserta en la base (INSERT)
+            } else { // si no, se esta modificando una existente...
+                movimientoDAO.modificar(movimiento); // ...actualiza sus datos en la base (UPDATE)
+            } 
+        } catch (SQLException ex) { // si fallo la base
+            vista.mostrarMensaje("Error en la base de datos: " + ex.getMessage()); // muestra el error
+            return; // sale sin marcar como guardado
+        } 
+        guardado = movimiento; // se guardo bien: deja la cabalgata para que ControladorPrincipal la lea
+        vista.dispose(); // cierra el formulario
+    } 
 
-    private void guardar() {
-        String error = validarCampos();
-        if (error != null) {
-            vista.mostrarMensaje(error);
-            return;
-        }
-        Movimiento movimiento = crearMovimiento();
-        error = validarHorario(movimiento);
-        if (error != null) {
-            vista.mostrarMensaje(error);
-            return;
-        }
-        try {
-            error = buscarSuperposicion(movimiento);
-            if (error != null) {
-                vista.mostrarMensaje(error);
-                return;
-            }
-            if (existente == null) {
-                movimientoDAO.insertar(movimiento);
-            } else {
-                movimientoDAO.modificar(movimiento);
-            }
-        } catch (SQLException ex) {
-            vista.mostrarMensaje("Error en la base de datos: " + ex.getMessage());
-            return;
-        }
-        guardado = movimiento;
-        vista.dispose();
-    }
+    private String validarCampos() { // revisa los datos del formulario; devuelve error o null
+        Caballo caballo = vista.getCaballo(); // caballo elegido en el desplegable
+        if (caballo == null) { // si no hay ninguno elegido...
+            return "Elegi un caballo"; // ...devuelve el error
+        } 
+        if (existente == null && !"Disponible".equals(caballo.getEstado())) { // si es una cabalgata nueva y el caballo no esta Disponible...
+            return caballo.getNombre() + " esta en descanso, no se le pueden agendar cabalgatas nuevas"; // ...devuelve el error (regla del descanso)
+        } 
+        if (vista.getCliente().isEmpty()) { // si el cliente esta vacio...
+            return "El cliente es obligatorio"; // ...devuelve el error
+        } 
+        return Validaciones.validarDatos(vista.getFecha(), vista.getHora(), vista.getTextoDuracion(), vista.getTextoPrecio()); // controla fecha, hora, duracion y precio; devuelve su error o null
+    } 
 
-    private String validarCampos() {
-        Caballo caballo = vista.getCaballo();
-        if (caballo == null) {
-            return "Elegi un caballo";
-        }
-        if (existente == null && !"Disponible".equals(caballo.getEstado())) {
-            return caballo.getNombre() + " esta en descanso, no se le pueden agendar cabalgatas nuevas";
-        }
-        try {
-            Fechas.leer(vista.getFecha());
-        } catch (DateTimeParseException ex) {
-            return "La fecha debe tener el formato DD-MM-AAAA (por ejemplo 25-10-2026)";
-        }
-        try {
-            LocalTime.parse(vista.getHora());
-        } catch (DateTimeParseException ex) {
-            return "La hora debe tener el formato HH:mm (por ejemplo 09:30)";
-        }
-        if (vista.getCliente().isEmpty()) {
-            return "El cliente es obligatorio";
-        }
-        Double duracion = leerNumero(vista.getTextoDuracion());
-        if (duracion == null || duracion <= 0) {
-            return "La duracion debe ser un numero mayor a 0";
-        }
-        Double precio = leerNumero(vista.getTextoPrecio());
-        if (precio == null || precio <= 0) {
-            return "El precio debe ser un numero mayor a 0";
-        }
-        return null;
-    }
-
-    private String validarHorario(Movimiento m) {
-        LocalDate dia = m.getInicio().toLocalDate();
-        LocalTime horaInicio = m.getInicio().toLocalTime();
-
-        if ("Nocturno".equals(m.getTipoRecorrido())) {
-            LocalDateTime medianoche = dia.plusDays(1).atStartOfDay();
-            if (horaInicio.isBefore(INICIO_NOCHE) || m.getFin().isAfter(medianoche)) {
-                return "Las cabalgatas nocturnas son de 19:00 a 00:00: tienen que empezar desde las 19:00 y terminar como maximo a medianoche. Para otro horario elegi el tipo Diurno.";
-            }
-            return null;
-        }
-
-        LocalDateTime cierreDia = dia.atTime(INICIO_NOCHE);
-        if (horaInicio.isBefore(INICIO_DIA) || m.getFin().isAfter(cierreDia)) {
-            return "Las cabalgatas diurnas son de 08:00 a 19:00: tienen que empezar desde las 08:00 y terminar como maximo a las 19:00. Para otro horario elegi el tipo Nocturno.";
-        }
-        return null;
-    }
-
-    private String buscarSuperposicion(Movimiento nuevo) throws SQLException {
-        for (Movimiento otro : movimientoDAO.listarPorCaballo(nuevo.getCaballo().getId())) {
-            if (existente != null && otro.getId() == existente.getId()) {
-                continue;
-            }
-            if (nuevo.seSuperponeCon(otro)) {
-                return nuevo.getCaballo().getNombre() + " ya tiene una cabalgata el " + Fechas.aTexto(otro.getFecha())
-                        + " de " + otro.getInicio().toLocalTime() + " a " + otro.getFin().toLocalTime() + ".";
-            }
-        }
-        return null;
-    }
-
-    private Movimiento crearMovimiento() {
-        Caballo caballo = vista.getCaballo();
-        String fecha = Fechas.aBase(vista.getFecha());
-        double duracion = leerNumero(vista.getTextoDuracion());
-        double precio = leerNumero(vista.getTextoPrecio());
-        Movimiento m;
-        if ("Nocturno".equals(vista.getTipo())) {
-            m = new MovimientoNocturno(caballo, fecha, vista.getHora(), vista.getCliente(), duracion, precio);
-        } else {
-            m = new MovimientoDiurno(caballo, fecha, vista.getHora(), vista.getCliente(), duracion, precio);
-        }
-        if (existente != null) {
-            m.setId(existente.getId());
-        }
+    private Movimiento crearMovimiento() { // arma la cabalgata con los datos del formulario
+        Caballo caballo = vista.getCaballo(); 
+        String fecha = Fechas.aBase(vista.getFecha()); // pasa la fecha de DD-MM-AAAA a AAAA-MM-DD (formato de la base)
+        double duracion = Validaciones.leerNumero(vista.getTextoDuracion()); // pasa el texto de la duracion a numero
+        double precio = Validaciones.leerNumero(vista.getTextoPrecio()); // pasa el texto del precio a numero
+        Movimiento m; // variable del tipo padre: va a guardar un Diurno o un Nocturno (polimorfismo)
+        if ("Nocturno".equals(vista.getTipo())) { // si el tipo elegido es Nocturno...
+            m = new MovimientoNocturno(caballo, fecha, vista.getHora(), vista.getCliente(), duracion, precio); // ...crea una cabalgata nocturna
+        } else { 
+            m = new MovimientoDiurno(caballo, fecha, vista.getHora(), vista.getCliente(), duracion, precio); // ...crea una cabalgata diurna
+        } 
+        if (existente != null) { // si se esta modificando...
+            m.setId(existente.getId()); // ...le pone el id de la original, para que el UPDATE sepa cual fila cambiar
+        } 
         return m;
-    }
-
-    private Double leerNumero(String texto) {
-        try {
-            return Double.parseDouble(texto.replace(',', '.'));
-        } catch (NumberFormatException ex) {
-            return null;
-        }
-    }
+    } 
 }

@@ -1,158 +1,104 @@
-package vista;
+package vista; // paquete donde esta esta clase: vista
 
-import java.awt.BorderLayout;
-import java.awt.Component;
-import java.awt.FlowLayout;
-import java.awt.GridLayout;
-import java.util.ArrayList;
-import java.util.List;
-import javax.swing.BorderFactory;
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JComboBox;
-import javax.swing.JDialog;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.JTextField;
-import modelo.Caballo;
-import modelo.Fechas;
-import modelo.Movimiento;
+import java.util.ArrayList; // ArrayList: lista que crece sola; la usamos para hacer una copia de la lista de caballos
+import java.util.List; // List: interfaz de lista; se declara con List y se crea con ArrayList
+import javax.swing.JCheckBox; // JCheckBox: casilla que se tilda o destilda
+import javax.swing.JComboBox; // JComboBox: lista desplegable para elegir una opcion
+import javax.swing.JFrame; // JFrame: ventana principal, la que recibe el dialogo como padre
+import javax.swing.JTextField; // JTextField: campo de texto de una linea
+import modelo.Caballo; // Caballo: clase del modelo; las opciones del combo son objetos Caballo
+import modelo.Fechas; // Fechas: clase del modelo que convierte fechas entre el formato de la base y el que se muestra
+import modelo.Movimiento; // Movimiento: la cabalgata; se usa en cargar() para llenar el formulario al editar
 
-public class MovimientoDialog extends JDialog {
+public class MovimientoDialog extends FormularioDialog { // formulario de cabalgata; extends FormularioDialog = hereda de la clase base (que es un JDialog)
 
-    private List<Caballo> caballos;
-    private JComboBox<Caballo> cmbCaballo = new JComboBox<>();
-    private JCheckBox chkSoloDisponibles = new JCheckBox("Mostrar solo caballos disponibles");
-    private JComboBox<String> cmbTipo = new JComboBox<>(new String[]{"Diurno", "Nocturno"});
-    private JTextField txtFecha = new JTextField(18);
-    private JTextField txtHora = new JTextField(18);
-    private JTextField txtCliente = new JTextField(18);
-    private JTextField txtDuracion = new JTextField(18);
-    private JTextField txtPrecio = new JTextField(18);
-    private JButton btnGuardar = Estilo.boton("Guardar", Estilo.VERDE);
-    private JButton btnCancelar = Estilo.boton("Cancelar", Estilo.GRIS);
+    private List<Caballo> caballos; // lista de caballos disponibles para elegir; <Caballo> = lista que solo guarda Caballo; private
+    private JComboBox<Caballo> cmbCaballo = new JComboBox<>(); // desplegable de objetos Caballo (muestra el nombre porque Caballo.toString devuelve el nombre)
+    private JCheckBox chkSoloDisponibles = new JCheckBox("Mostrar solo caballos disponibles"); // casilla para filtrar el desplegable y ver solo los caballos con estado Disponible
+    private JComboBox<String> cmbTipo = new JComboBox<>(new String[]{"Diurno", "Nocturno"}); // desplegable con los dos tipos de recorrido; el controlador crea un Diurno o un Nocturno segun esto
+    private JTextField txtFecha = new JTextField(18); // campo para la fecha (DD-MM-AAAA); 18 = ancho en columnas
+    private JTextField txtHora = new JTextField(18); // campo para la hora de inicio (HH:mm)
+    private JTextField txtCliente = new JTextField(18); // campo para el nombre del cliente
+    private JTextField txtDuracion = new JTextField(18); // campo para la duracion en horas (texto; el controlador lo pasa a numero)
+    private JTextField txtPrecio = new JTextField(18); // campo para el precio por hora (texto; el controlador lo pasa a numero)
 
-    public MovimientoDialog(JFrame padre, String titulo, List<Caballo> caballos) {
-        super(padre, titulo, true);
-        this.caballos = new ArrayList<>(caballos);
-        setLayout(new BorderLayout());
-        getContentPane().setBackground(Estilo.FONDO);
+    public MovimientoDialog(JFrame padre, String titulo, List<Caballo> caballos) { // constructor: recibe la ventana padre, el titulo y la lista de caballos a mostrar en el combo
+        super(padre, titulo, 8); // llama al constructor del padre FormularioDialog: dialogo modal con 8 filas en la grilla
+        this.caballos = new ArrayList<>(caballos); // guarda una copia de la lista recibida (asi no se comparte la original); this = el atributo
 
-        chkSoloDisponibles.setBackground(Estilo.FONDO);
-        chkSoloDisponibles.setForeground(Estilo.TEXTO);
-        chkSoloDisponibles.addActionListener(e -> filtrar());
-        filtrar();
+        chkSoloDisponibles.setBackground(Estilo.FONDO); // color de fondo de la casilla igual al del dialogo
+        chkSoloDisponibles.setForeground(Estilo.TEXTO); // color del texto de la casilla
+        chkSoloDisponibles.addActionListener(e -> filtrar()); // lambda (e -> ...): al tildar o destildar la casilla se ejecuta filtrar() para rearmar el combo
+        filtrar(); // llena el combo por primera vez con los caballos que correspondan
 
-        Estilo.campo(txtFecha);
-        Estilo.campo(txtHora);
-        Estilo.campo(txtCliente);
-        Estilo.campo(txtDuracion);
-        Estilo.campo(txtPrecio);
+        agregarFila("Caballo", cmbCaballo); // agregarFila viene del padre; el combo no es JTextField, asi que usa la sobrecarga para cualquier Component
+        agregarFila("", chkSoloDisponibles); // fila con etiqueta vacia: deja la casilla alineada bajo el combo
+        agregarFila("Tipo de recorrido", cmbTipo); // agrega la fila del tipo de recorrido (otro combo)
+        agregarFila("Fecha (DD-MM-AAAA)", txtFecha); // JTextField: usa la sobrecarga que ademas le aplica el estilo al campo
+        agregarFila("Hora (HH:mm)", txtHora); // agrega la fila de la hora
+        agregarFila("Cliente", txtCliente); // agrega la fila del cliente
+        agregarFila("Duracion (horas)", txtDuracion); // agrega la fila de la duracion
+        agregarFila("Precio por hora", txtPrecio); // agrega la fila del precio por hora
+        armar(); // armar viene del padre: agrega la grilla al centro, los botones abajo, y ajusta tamanio y posicion
+    } // fin del constructor
 
-        JPanel formulario = new JPanel(new GridLayout(8, 2, 10, 10));
-        formulario.setBackground(Estilo.FONDO);
-        formulario.setBorder(BorderFactory.createEmptyBorder(15, 15, 5, 15));
-        agregarFila(formulario, "Caballo", cmbCaballo);
-        agregarFila(formulario, "", chkSoloDisponibles);
-        agregarFila(formulario, "Tipo de recorrido", cmbTipo);
-        agregarFila(formulario, "Fecha (DD-MM-AAAA)", txtFecha);
-        agregarFila(formulario, "Hora (HH:mm)", txtHora);
-        agregarFila(formulario, "Cliente", txtCliente);
-        agregarFila(formulario, "Duracion (horas)", txtDuracion);
-        agregarFila(formulario, "Precio por hora", txtPrecio);
+    private void filtrar() { // vuelve a llenar el combo segun la casilla; private porque solo se usa dentro de esta clase
+        Caballo seleccionado = (Caballo) cmbCaballo.getSelectedItem(); // guarda el caballo elegido ahora (cast de Object a Caballo) para no perder la seleccion al rearmar
+        cmbCaballo.removeAllItems(); // vacia el combo
+        for (Caballo c : caballos) { // for-each: recorre la lista de caballos, uno por vuelta
+            if (!chkSoloDisponibles.isSelected() || "Disponible".equals(c.getEstado())) { // agrega el caballo si la casilla esta destildada o si su estado es Disponible (equals con el literal evita null)
+                cmbCaballo.addItem(c); // agrega el caballo como opcion del combo
+            } // fin del if
+        } // fin del for
+        if (seleccionado != null) { // si antes habia un caballo elegido...
+            seleccionarCaballo(seleccionado.getId()); // ...lo vuelve a seleccionar buscandolo por id
+        } // fin del if
+    } // fin del metodo
 
-        JPanel botones = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
-        botones.setBackground(Estilo.FONDO);
-        botones.add(btnGuardar);
-        botones.add(btnCancelar);
+    private void seleccionarCaballo(int id) { // selecciona en el combo el caballo con ese id; private: es ayuda interna
+        for (int i = 0; i < cmbCaballo.getItemCount(); i++) { // for clasico: recorre las posiciones del combo de 0 hasta la ultima
+            if (cmbCaballo.getItemAt(i).getId() == id) { // si el caballo de esa posicion tiene el id buscado...
+                cmbCaballo.setSelectedIndex(i); // ...lo deja seleccionado en el combo
+                return; // termina el metodo: ya lo encontro, no hace falta seguir
+            } // fin del if
+        } // fin del for
+    } // fin del metodo
 
-        add(Estilo.titulo(titulo, Estilo.VERDE), BorderLayout.NORTH);
-        add(formulario, BorderLayout.CENTER);
-        add(botones, BorderLayout.SOUTH);
+    public void cargar(Movimiento m) { // carga una cabalgata en el formulario; el controlador lo llama al editar
+        seleccionarCaballo(m.getCaballo().getId()); // elige en el combo el caballo de la cabalgata
+        cmbTipo.setSelectedItem(m.getTipoRecorrido()); // elige el tipo de recorrido de la cabalgata
+        txtFecha.setText(Fechas.aTexto(m.getFecha())); // Fechas.aTexto pasa la fecha de formato base (AAAA-MM-DD) a DD-MM-AAAA (esta sobrecargado: acepta String o LocalDate)
+        txtHora.setText(m.getHoraInicio()); // pone la hora de inicio
+        txtCliente.setText(m.getCliente()); // pone el nombre del cliente
+        txtDuracion.setText(String.valueOf(m.getDuracion())); // String.valueOf pasa el numero de duracion a texto para el campo
+        txtPrecio.setText(String.valueOf(m.getPrecio())); // String.valueOf pasa el numero de precio a texto para el campo
+    } // fin del metodo
 
-        pack();
-        setResizable(false);
-        setLocationRelativeTo(padre);
-    }
+    public Caballo getCaballo() { // getter: devuelve el caballo elegido en el combo; lo usa ControladorMovimiento
+        return (Caballo) cmbCaballo.getSelectedItem(); // getSelectedItem devuelve Object, por eso se castea a Caballo
+    } // fin del metodo
 
-    private void agregarFila(JPanel panel, String texto, Component campo) {
-        JLabel etiqueta = new JLabel(texto);
-        etiqueta.setForeground(Estilo.TEXTO);
-        panel.add(etiqueta);
-        panel.add(campo);
-    }
+    public String getTipo() { // getter: devuelve "Diurno" o "Nocturno"; el controlador decide con eso que clase crear
+        return (String) cmbTipo.getSelectedItem(); // getSelectedItem devuelve Object, por eso se castea a String
+    } // fin del metodo
 
-    private void filtrar() {
-        Caballo seleccionado = (Caballo) cmbCaballo.getSelectedItem();
-        cmbCaballo.removeAllItems();
-        for (Caballo c : caballos) {
-            if (!chkSoloDisponibles.isSelected() || "Disponible".equals(c.getEstado())) {
-                cmbCaballo.addItem(c);
-            }
-        }
-        if (seleccionado != null) {
-            seleccionarCaballo(seleccionado.getId());
-        }
-    }
+    public String getFecha() { // getter: devuelve la fecha escrita (texto); el controlador la valida y la convierte
+        return txtFecha.getText().trim(); // getText toma el texto del campo y trim saca los espacios de los extremos
+    } // fin del metodo
 
-    private void seleccionarCaballo(int id) {
-        for (int i = 0; i < cmbCaballo.getItemCount(); i++) {
-            if (cmbCaballo.getItemAt(i).getId() == id) {
-                cmbCaballo.setSelectedIndex(i);
-                return;
-            }
-        }
-    }
+    public String getHora() { // getter: devuelve la hora escrita; lo usa ControladorMovimiento
+        return txtHora.getText().trim(); // devuelve el texto del campo de hora sin espacios sobrantes
+    } // fin del metodo
 
-    public void cargar(Movimiento m) {
-        seleccionarCaballo(m.getCaballo().getId());
-        cmbTipo.setSelectedItem(m.getTipoRecorrido());
-        txtFecha.setText(Fechas.aTexto(m.getFecha()));
-        txtHora.setText(m.getHoraInicio());
-        txtCliente.setText(m.getCliente());
-        txtDuracion.setText(String.valueOf(m.getDuracion()));
-        txtPrecio.setText(String.valueOf(m.getPrecio()));
-    }
+    public String getCliente() { // getter: devuelve el cliente escrito; lo usa ControladorMovimiento
+        return txtCliente.getText().trim(); // devuelve el texto del campo de cliente sin espacios sobrantes
+    } // fin del metodo
 
-    public void mostrarMensaje(String mensaje) {
-        JOptionPane.showMessageDialog(this, mensaje);
-    }
+    public String getTextoDuracion() { // getter: devuelve la duracion como texto; el controlador la valida y la pasa a numero
+        return txtDuracion.getText().trim(); // devuelve el texto del campo de duracion sin espacios sobrantes
+    } // fin del metodo
 
-    public JButton getBtnGuardar() {
-        return btnGuardar;
-    }
-
-    public JButton getBtnCancelar() {
-        return btnCancelar;
-    }
-
-    public Caballo getCaballo() {
-        return (Caballo) cmbCaballo.getSelectedItem();
-    }
-
-    public String getTipo() {
-        return (String) cmbTipo.getSelectedItem();
-    }
-
-    public String getFecha() {
-        return txtFecha.getText().trim();
-    }
-
-    public String getHora() {
-        return txtHora.getText().trim();
-    }
-
-    public String getCliente() {
-        return txtCliente.getText().trim();
-    }
-
-    public String getTextoDuracion() {
-        return txtDuracion.getText().trim();
-    }
-
-    public String getTextoPrecio() {
-        return txtPrecio.getText().trim();
-    }
-}
+    public String getTextoPrecio() { // getter: devuelve el precio como texto; el controlador lo valida y lo pasa a numero
+        return txtPrecio.getText().trim(); // devuelve el texto del campo de precio sin espacios sobrantes
+    } // fin del metodo
+} // fin de la clase

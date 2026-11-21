@@ -1,168 +1,48 @@
-<div align="center">
+# Cabalgatas — Sistema de gestión de cabalgatas
 
-# 🐎 Cabalgatas
+Aplicación de escritorio en **Java Swing + SQLite** para gestionar los caballos y las salidas (cabalgatas) de una empresa de turismo ecuestre de Mendoza.
 
-**Sistema de gestión de caballos y cabalgatas para una empresa de turismo ecuestre en Mendoza**
+Proyecto individual de **Programación III** — Licenciatura en Sistemas de Información, Universidad Champagnat (2026).
 
-![Java](https://img.shields.io/badge/Java-23-orange?logo=openjdk&logoColor=white)
-![Swing](https://img.shields.io/badge/UI-Swing-5A6B3F)
-![SQLite](https://img.shields.io/badge/SQLite-3.46-003B57?logo=sqlite&logoColor=white)
-![MVC](https://img.shields.io/badge/patrón-MVC-A5654B)
-![NetBeans](https://img.shields.io/badge/IDE-NetBeans-1B6AC6?logo=apachenetbeanside&logoColor=white)
+![Ventana principal](docs/capturas/1-ventana-principal.png)
 
-*Trabajo Práctico 2 · Programación III · Universidad Champagnat*
+## Funcionalidades
 
-</div>
+- **ABM de caballos**: alta, modificación y baja, con buscador por nombre o raza.
+- **Maestro-detalle**: al elegir un caballo se ven todas sus cabalgatas.
+- **ABM de cabalgatas** individuales y carga de **grupos** (varios caballos para la misma salida).
+- **Agenda del día**: navegación por fecha, con la cantidad de cabalgatas y el total facturado.
+- **Validaciones de negocio**: un caballo no puede estar en dos cabalgatas que se superpongan en fecha y hora; formatos de fecha y hora; campos obligatorios.
+- **Precio final según el tipo de recorrido** (diurno o nocturno), calculado con polimorfismo.
 
----
-
-## 📸 Vista previa
-
-![Ventana principal](captura.png.png)
-
-## ✨ Qué hace
-
-- **ABM completo** de caballos y de cabalgatas (alta, baja y modificación).
-- **Maestro-detalle:** al elegir un caballo se ven automáticamente sus cabalgatas.
-- **Buscador** de caballos por nombre o raza, que filtra mientras escribís.
-- **Agenda del día:** muestra las cabalgatas de la fecha elegida y el total a cobrar, con botones para ir al día anterior, al siguiente o a hoy.
-- **Precio automático:** las cabalgatas diurnas cobran precio × horas; las nocturnas suman un 20% de recargo.
-- **Diseño propio** con tarjetas redondeadas, botones con iconos y colores en tonos verdes, centralizado en una clase `Estilo`.
-
-## ✅ Reglas de negocio y validaciones
-
-| Regla | Detalle |
+| Nueva cabalgata | Validación de superposición |
 |---|---|
-| Sin superposiciones | Un caballo no puede estar en dos cabalgatas a la misma fecha y hora |
-| Horarios por tipo | Diurnas de 08:00 a 19:00, nocturnas de 19:00 a 00:00 |
-| Caballos en descanso | No se les pueden agendar cabalgatas nuevas |
-| Cambio de estado | No se puede pasar a "En descanso" un caballo con cabalgatas a futuro |
-| Borrado seguro | No se puede eliminar un caballo que tiene cabalgatas registradas |
-| Formatos | Fecha `DD-MM-AAAA`, hora `HH:mm`, cliente obligatorio, duración y precio mayores a 0 |
+| ![Nueva cabalgata](docs/capturas/2-nueva-cabalgata.png) | ![Validación](docs/capturas/3-validacion-superposicion.png) |
 
-## 🧱 Arquitectura (MVC)
+## Tecnologías y conceptos
 
-Cada vista tiene su propio controlador. Las vistas no tienen lógica y **solo los DAO escriben SQL**.
+- **Java** (POO): herencia, encapsulamiento y polimorfismo. `Movimiento` es una clase abstracta con las subclases `MovimientoDiurno` y `MovimientoNocturno`, que redefinen `calcularPrecioFinal()`.
+- **Java Swing**: `JFrame`, `JDialog`, `JTable`, `JComboBox`, `JCheckBox` y estilos propios.
+- **SQLite + JDBC**: acceso a datos con el patrón **DAO** y `PreparedStatement`.
+- **Patrón MVC**: paquetes `modelo`, `vista` y `controlador`, con un controlador por vista.
 
-| Capa | Clases | Responsabilidad |
-|---|---|---|
-| **Modelo** | `Caballo`, `Movimiento`, `MovimientoDiurno`, `MovimientoNocturno`, `Fechas`, `Conexion`, `CaballoDAO`, `MovimientoDAO` | Datos, reglas de precio y acceso a SQLite |
-| **Vista** | `VentanaPrincipal`, `CaballoDialog`, `MovimientoDialog`, `Estilo` | Pantallas: muestran datos y exponen botones y campos |
-| **Controlador** | `ControladorPrincipal`, `ControladorCaballo`, `ControladorMovimiento`, `ControladorAgenda` | Escuchan los botones, validan, llaman a los DAO y actualizan la vista |
-
-### Programación orientada a objetos
-
-```mermaid
-classDiagram
-    class Movimiento {
-        <<abstract>>
-        -int id
-        -Caballo caballo
-        -String tipoRecorrido
-        -String fecha
-        -String horaInicio
-        -String cliente
-        -double duracion
-        -double precio
-        +calcularPrecioFinal()* double
-        +getInicio() LocalDateTime
-        +getFin() LocalDateTime
-        +seSuperponeCon(Movimiento) boolean
-    }
-    class MovimientoDiurno {
-        +calcularPrecioFinal() double
-    }
-    class MovimientoNocturno {
-        -double recargo
-        +calcularPrecioFinal() double
-    }
-    class Caballo {
-        -int id
-        -String nombre
-        -String raza
-        -int edad
-        -String pelaje
-        -String estado
-    }
-    Movimiento <|-- MovimientoDiurno
-    Movimiento <|-- MovimientoNocturno
-    Movimiento "*" --> "1" Caballo
-```
-
-- **Herencia:** `MovimientoDiurno` y `MovimientoNocturno` heredan de la clase abstracta `Movimiento`.
-- **Encapsulamiento:** todos los atributos son privados, con getters y setters.
-- **Polimorfismo:** `calcularPrecioFinal()` se implementa distinto en cada subclase y se invoca sin saber de qué tipo es cada objeto.
-
-## 🗄️ Base de datos
-
-Dos tablas relacionadas (1 a N): un caballo puede tener muchas cabalgatas.
-
-```mermaid
-erDiagram
-    CABALLO ||--o{ MOVIMIENTO : tiene
-    CABALLO {
-        integer id PK
-        text nombre
-        text raza
-        integer edad
-        text pelaje
-        text estado
-    }
-    MOVIMIENTO {
-        integer id PK
-        integer caballo_id FK
-        text tipo_recorrido
-        text fecha
-        text hora_inicio
-        text cliente
-        real duracion
-        real precio
-    }
-```
-
-La base `cabalgatas.db` se crea sola al iniciar el programa. Las fechas se guardan como `AAAA-MM-DD` (para ordenar y filtrar con SQL) y se muestran como `DD-MM-AAAA`.
-
-## 🛠️ Tecnologías
-
-- **Java 23** con **Swing** (`JFrame`, `JDialog`, `JTable`, `JComboBox`, `JCheckBox`)
-- **SQLite** con **JDBC** (`sqlite-jdbc 3.46.1.3`, incluido en `lib/`)
-- **NetBeans** como entorno de desarrollo
-
-## 📁 Estructura del proyecto
+## Estructura
 
 ```
-Cabalgatas/
-├── lib/                      sqlite-jdbc
-├── src/
-│   ├── cabalgatas/           clase principal (main)
-│   ├── modelo/               entidades, DAO, conexión y fechas
-│   ├── vista/                ventanas y estilo
-│   ├── controlador/          un controlador por vista
-│   └── imagenes/             logo
-├── captura.png.png           captura de pantalla
-└── cabalgatas.db             base de datos SQLite
+src/
+├── cabalgatas/    Clase principal (main)
+├── modelo/        Entidades, DAO, conexión y validaciones
+├── vista/         Ventanas y diálogos Swing
+└── controlador/   Lógica que conecta vistas y modelo
+lib/               Driver sqlite-jdbc
 ```
 
-## ▶️ Cómo ejecutarlo
+## Cómo ejecutarlo
 
-1. Clonar el repositorio o descargar el ZIP.
-2. Abrir el proyecto en **NetBeans** (`File → Open Project`).
-3. Ejecutar la clase `Cabalgatas` (botón verde de Run).
+1. Abrir el proyecto en **NetBeans** (o cualquier IDE con Java 21 o superior).
+2. Verificar que `lib/sqlite-jdbc-3.46.1.3.jar` esté agregado a las librerías del proyecto.
+3. Ejecutar `cabalgatas.Cabalgatas`. La base `cabalgatas.db` se crea sola la primera vez.
 
-Requiere tener instalado un JDK (el proyecto usa JDK 23).
+## Autora
 
-## 🚀 Mejoras futuras
-
-- **Cabalgatas grupales:** poder asignar varios caballos a una misma cabalgata (por ejemplo, un grupo de clientes), manteniendo la validación de superposición para cada uno.
-- **Tabla de clientes:** guardar los clientes en su propia tabla relacionada, en lugar de escribir el nombre en cada cabalgata.
-- **Descanso automático:** marcar a un caballo como "En descanso" cuando supere cierta cantidad de horas de trabajo en un día o una semana.
-- **Vista semanal tipo calendario:** además de la agenda del día, ver la semana completa.
-- **Reportes:** ingresos por mes y caballos más utilizados, con exportación a PDF o Excel.
-- **Usuarios y permisos:** inicio de sesión con distintos roles (administrador y empleado).
-- **Pruebas automáticas:** tests unitarios para las reglas de precio y de superposición.
-
-## 👩‍💻 Autora
-
-**Mia Nogara** · Licenciatura en Sistemas de Información · Universidad Champagnat
-
-Materia: Programación III · Prof. Elio Togno
+**Mia Nogara** — [LinkedIn](https://linkedin.com/in/mia-nogara) · [GitHub](https://github.com/mianogaraa)
